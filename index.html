@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Feed Beluga</title>
+  
+  <!-- CRITICAL CSS - INLINE -->
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      margin: 0; 
+      padding: 0; 
+      background: #fceec8; 
+      font-family: Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+    #main-screen { 
+      text-align: center; 
+      padding: 20px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .title { 
+      font-size: 48px; 
+      color: #5c4023; 
+      margin-bottom: 0;
+      font-weight: bold;
+      text-shadow: 2px 2px 0px rgba(255, 255, 255, 0.5);
+      line-height: 1.2;
+    }
+    .best-score {
+      font-size: 24px;
+      color: #5c4023;
+      margin-bottom: 0;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.3);
+      padding: 10px 20px;
+      border-radius: 10px;
+      display: inline-block;
+    }
+    .menu-btn {
+      padding: 15px 40px;
+      background: #ffdd7e;
+      border: none;
+      border-radius: 12px;
+      font-size: 22px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #5c4023;
+      transition: transform 0.2s;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      margin-top: 10px;
+    }
+    .menu-btn:hover {
+      transform: scale(1.05);
+      background: #ffd350;
+    }
+    .menu-btn.secondary {
+      background: #7a5a3b;
+      color: #ffdd7e;
+    }
+    
+    /* PAUSE BUTTON */
+    #pause-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      background: rgba(255, 255, 255, 0.8);
+      border: none;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+      z-index: 300;
+      display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    #pause-btn:hover {
+      background: rgba(255, 255, 255, 1);
+      transform: scale(1.1);
+    }
+    
+    /* COOLDOWN INDICATOR */
+    #cooldown-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      font-weight: 900;
+      color: #ff6b6b;
+      text-shadow: 2px 2px 0 #ffffff88;
+      z-index: 999;
+      display: none;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px 30px;
+      border-radius: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    /* Game Container Base Styles */
+    #game-container {
+      width: 100%;
+      height: 100vh;
+      background: #FFF4C2;
+      position: relative;
+      overflow: hidden;
+      display: none;
+    }
+    
+    /* UI Base Styles */
+    #ui {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #5c4023;
+      font-size: 24px;
+      font-weight: bold;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    
+    /* Overlay Base Styles */
+    .pause-screen, .gameover-screen, .manual-pause-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.5);
+      z-index: 9998;
+      display: none;
+    }
+    
+    .pause-card, .go-card, .manual-pause-card {
+      background: rgba(255,255,255,0.95);
+      padding: 24px 28px;
+      border-radius: 12px;
+      text-align: center;
+      color: #5c4023;
+      min-width: 260px;
+    }
+  </style>
+  
+  <!-- MAIN CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=2.4">
+</head>
+<body>
+
+  <!-- MAIN SCREEN -->
+  <div id="main-screen">
+    <h1 class="title">Feed Beluga!</h1>
+    <div id="best-score" class="best-score">Best Score: 0</div>
+    <button id="playBtn" class="menu-btn">Play</button>
+  </div>
+
+  <!-- MANUAL PAUSE OVERLAY (user-initiated pause) -->
+  <div id="manual-pause-screen" class="manual-pause-screen">
+    <div class="manual-pause-card">
+      <p class="pause-title">Game Paused</p>
+      <div class="pause-buttons">
+        <button id="resumeBtn" class="menu-btn">Resume</button>
+        <button id="pauseMainMenuBtn" class="menu-btn secondary">Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTO PAUSE OVERLAY (missed note) -->
+  <div id="pause-screen" class="pause-screen">
+    <div class="pause-card">
+      <p class="pause-title">Missed!</p>
+      <p class="pause-sub">Swipe Up or Tap to Continue</p>
+      <p class="pause-lives">Lives: <span id="lifeDisplay">3</span></p>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-container">
+    <audio id="bgm" loop>
+      <source src="{{ url_for('static', filename='Like A Dino!.mp3') }}" type="audio/mpeg">
+      Your browser does not support the audio element.
+    </audio>
+
+    <!-- PAUSE BUTTON -->
+    <button id="pause-btn">⏸️</button>
+
+    <!-- COOLDOWN INDICATOR -->
+    <div id="cooldown-indicator"></div>
+
+    <div id="catcher"></div>
+    <div id="note-container"></div>
+
+    <div id="ui">
+      <div id="score">Score: 0</div>
+      <div id="combo">Combo: 0</div>
+      <div id="lives">❤️ <span id="lifeCount">3</span></div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="gameover-screen" class="gameover-screen">
+    <div class="go-card">
+      <h2>Game Over</h2>
+      <p id="finalScore">Score: 0</p>
+      <div class="gameover-buttons">
+        <button id="retryBtn" class="menu-btn">Play Again</button>
+        <button id="mainMenuBtn" class="menu-btn secondary">Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='dino.js') }}?v=2.4"></script>
+</body>
+</html>
